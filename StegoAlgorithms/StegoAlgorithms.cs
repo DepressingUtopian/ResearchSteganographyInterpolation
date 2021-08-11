@@ -19,8 +19,9 @@ namespace StegoAlgorithms
   // LSB - Простая реализация, запись в каждые младший бит
   public class LSB : IStegoAlgorithm
   {
-    private const string OUT_PATH_ENCODE = @"C:\Users\Xen\Documents\StegoResearch\Code\results\lsb/encode";
-    private const string OUT_PATH_DECODE = @"C:\Users\Xen\Documents\StegoResearch\Code\results\lsb/decode";
+    private const string OUT_PATH_ENCODE = @"C:/Users/Xen/Documents/StegoResearch/Code/results/lsb/encode";
+    private const string OUT_PATH_DECODE = @"C:/Users/Xen/Documents/StegoResearch/Code/results/lsb/decode";
+
     static public int Encode(string stegoImagePath, string coveredFilePath, string outputPath)
     {
       ImageBuilder imageBuilder = new ImageBuilder(stegoImagePath);
@@ -123,8 +124,8 @@ namespace StegoAlgorithms
 
   public class StegoInterpolation : IStegoAlgorithm
   {
-    private const string OUT_PATH_ENCODE = @"C:\Users\Xen\Documents\StegoResearch\Code\results\interpol\encode";
-    private const string OUT_PATH_DECODE = @"C:\Users\Xen\Documents\StegoResearch\Code\results\interpol\decode";
+    private const string OUT_PATH_ENCODE = @"C:/Users/Xen/Documents/StegoResearch/Code/results/interpol/encode";
+    private const string OUT_PATH_DECODE = @"C:/Users/Xen/Documents/StegoResearch/Code/results/interpol/decode";
     static private byte Interpolate(params byte[] values)
     {
       byte result = 0;
@@ -155,33 +156,31 @@ namespace StegoAlgorithms
 
       Bitmap imageBitmap = new Bitmap(imageBuilder.Bitmap);
       int totalPixels = imageBitmap.Width * imageBitmap.Height;
+      int fileSize = fileBuilder.Data.Count;
 
-      if (fileBuilder.Data.Count * 8 > totalPixels)
+      if (fileSize * 8 > totalPixels / 3)
       {
-        throw new Exception(String.Format("Не возможно внедрить файл в изображение, не хватает {0} бит", fileBuilder.Data.Count * 8 - totalPixels * 3));
+        throw new Exception(String.Format("Не возможно внедрить файл в изображение, не хватает {0} бит", Math.Abs(fileBuilder.Data.Count * 8 - totalPixels * 3)));
       }
 
       int fileIterIndex = 0;
-      for (int x = 0; x < imageBitmap.Width; x++)
+      for (int x = 0; x < imageBitmap.Width; x += 1)
       {
-        if (fileIterIndex >= fileBuilder.Data.Count)
+        if (fileIterIndex >= fileSize)
           break;
 
 
-        for (int y = 0; y < imageBitmap.Height; y++)
+        for (int y = 0; y < imageBitmap.Height; y += 1)
         {
-          if (fileIterIndex >= fileBuilder.Data.Count)
+          if (fileIterIndex >= fileSize)
             break;
 
           Color resultPixel = new Color();
           byte fileByte = (byte)fileBuilder.Data[fileIterIndex++];
 
-          //В одном байте 8 бит!
-          for (int i = 0; i < 8; i++)
+          int bitIter = 0;
+          while (bitIter < 8)
           {
-            byte bit = (byte)(fileByte & 1);
-            fileByte = (byte)(fileByte >> 1);
-
             if (y >= imageBitmap.Height)
             {
               x++;
@@ -216,15 +215,33 @@ namespace StegoAlgorithms
               newInterValue = Interpolate(GetByteArrayFromPixels(computePixel, nextNeighbourPixel, prevNeighbourPixel));
             }
 
-            resultPixel = Color.FromArgb(pixel.A, pixel.R, newInterValue + bit, pixel.B);
-            imageBitmap.SetPixel(x, y, resultPixel);
+            //  Узнаем разницу между найденным значением и исходным
+            int diff = Math.Abs(newInterValue - pixel.G);
+            //  Узнаем сколько бит мы можем скрыть
+            int bitInjectionCount = (int)Math.Round(Math.Log2(Math.Abs(diff)));
+
+            //  Внедряем
+            // int injectedBits = (diff & (~0 << (bitInjectionCount))) | (fileByte & (~(~0 << (bitInjectionCount))));
+            // Если различие больше 0, тогда можно внедрить информацию
+            if (bitInjectionCount > 0)
+            {
+              int injectedBits = (fileByte & (~(~0 << (bitInjectionCount))));
+              int newInjectedValue = newInterValue + injectedBits;
+
+              fileByte = (byte)(fileByte >> bitInjectionCount);
+              bitIter += bitInjectionCount;
+              resultPixel = Color.FromArgb(pixel.A, pixel.R, newInjectedValue, pixel.B);
+
+              imageBitmap.SetPixel(x, y, resultPixel);
+            }
+
             y += 2;
           }
         }
       }
 
       imageBuilder.Bitmap = imageBitmap;
-      // imageBuilder.Save(OUT_PATH_ENCODE);
+      imageBuilder.Save(OUT_PATH_ENCODE);
       return fileBuilder.Data.Count;
     }
 
@@ -269,6 +286,7 @@ namespace StegoAlgorithms
             Color prevNeighbourPixel = Color.FromArgb(0, 0, 0, 0);
             int newInterValue = 0;
 
+
             //Если сверху нет соседнего пикселя
             if (y - 1 < 0 && y + 1 < imageBitmap.Height)
             {
@@ -291,7 +309,17 @@ namespace StegoAlgorithms
               newInterValue = Interpolate(GetByteArrayFromPixels(computePixel, nextNeighbourPixel, prevNeighbourPixel));
             }
 
-            fileByte |= (byte)(((originalPixel.G - newInterValue) & 1) << i);
+            //  Узнаем разницу между найденным значением и исходным
+            int diff = Math.Abs(newInterValue - originalPixel.G);
+            //  Узнаем сколько бит было скрыто
+            int bitInjectionCount = diff > 0 ? (int)Math.Round(Math.Log2(Math.Abs(diff))) : 0;
+            // Если различие больше 0, то тогда можно извлечь
+            if (bitInjectionCount > 0)
+            {
+              int injectedBits = (fileByte & (~(~0 << (bitInjectionCount))));
+              fileByte |= (byte)(diff << i);
+              i += bitInjectionCount;
+            }
             y += 2;
           }
 
@@ -302,4 +330,6 @@ namespace StegoAlgorithms
       fileBuilder.Save(OUT_PATH_DECODE);
     }
   }
+
+  
 }

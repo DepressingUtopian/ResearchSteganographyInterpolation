@@ -49,7 +49,7 @@ namespace ImageWorker
     {
       string resultPath = outputPath.Length > 0 ? outputPath : ImageBuilder.outputPath;
       string resultName = outputFilename.Length > 0 ? outputFilename : filename;
-      Directory.CreateDirectory(Path.GetDirectoryName(outputPath));
+      Directory.CreateDirectory(resultPath);
       bitmap.Save(String.Format("{0}/{1}", resultPath, resultName));
     }
   }

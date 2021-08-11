@@ -41,7 +41,7 @@ namespace FileWorker
 
     public void Save(string outputPath = "")
     {
-      Directory.CreateDirectory(Path.GetDirectoryName(outputPath));
+      Directory.CreateDirectory(outputPath);
       File.WriteAllBytes(String.Format("{0}/{1}", outputPath, filename), (byte[]) Data.ToArray(typeof(byte)));
     }
   }

@@ -41,9 +41,10 @@ namespace StegoAnalysys
     }
     public static void getPixelComponentToFile(
       string imagePath, 
-      bool isRed = false,
-      bool isGreen = false,
-      bool isBlue = false,
+      string outputFilename,
+      bool isRed = true,
+      bool isGreen = true,
+      bool isBlue = true,
       bool isRandom = false,
       int numSelectedBit = 8
     )
@@ -75,7 +76,7 @@ namespace StegoAnalysys
           imageBuilder.Bitmap.SetPixel(x, y, newPixel);
         }
 
-      imageBuilder.Save(OUT_PATH_ATTACK, Path.GetFileName(imagePath));
+      imageBuilder.Save(OUT_PATH_ATTACK, outputFilename == null ? Path.GetFileName(imagePath) : outputFilename);
     }
   }
 }
